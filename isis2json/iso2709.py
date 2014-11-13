@@ -34,7 +34,10 @@ SUBFIELD_DELIMITER = '^'
 class IsoFile(object):
 
     def __init__(self, filename, encoding = DEFAULT_ENCODING):
-        self.file = open(filename, 'rb')
+        if isinstance(filename, file):
+            self.file = filename
+        else:
+            self.file = open(filename, 'rb')
         self.encoding = encoding
 
     def __iter__(self):
