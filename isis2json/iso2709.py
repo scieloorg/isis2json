@@ -20,8 +20,9 @@
 
 from struct import unpack
 
-CR =  '\x0D' # \r
-LF =  '\x0A' # \n
+CR = '\r'.encode('ascii')  # 0x0d
+LF = '\n'.encode('ascii')  # 0x0a
+EMPTY = ''.encode('ascii')
 IS1 = '\x1F' # ECMA-48 Unit Separator
 IS2 = '\x1E' # ECMA-48 Record Separator / ISO-2709 field separator
 IS3 = '\x1D' # ECMA-48 Group Separator / ISO-2709 record separator
@@ -34,7 +35,7 @@ SUBFIELD_DELIMITER = '^'
 class IsoFile(object):
 
     def __init__(self, filename, encoding = DEFAULT_ENCODING):
-        if isinstance(filename, file):
+        if hasattr(filename, "read"):  # File-like object
             self.file = filename
         else:
             self.file = open(filename, 'rb')
@@ -59,14 +60,10 @@ class IsoFile(object):
             chunk = self.file.read(size-count)
             if len(chunk) == 0:
                 break
-            chunk = chunk.replace(CR+LF,'')
-            if CR in chunk:
-                chunk = chunk.replace(CR,'')
-            if LF in chunk:
-                chunk = chunk.replace(LF,'')
+            chunk = chunk.replace(CR, EMPTY).replace(LF, EMPTY)
             count += len(chunk)
             chunks.append(chunk)
-        return ''.join(chunks)
+        return EMPTY.join(chunks)
 
     def close(self):
         self.file.close()

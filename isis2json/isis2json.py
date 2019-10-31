@@ -85,8 +85,19 @@ def iterMstRecords(master_file_name, isis_json_type):
     mst.close()
 
 def iterIsoRecords(iso_file_name, isis_json_type):
-    from iso2709 import IsoFile
-    from subfield import expand
+    # The full path absolute import is required
+    # when running it as an installed package
+    # with "python -m isis2json.isis2json",
+    # the alternative is required to run it directly from its directory
+    # instead of it in the first place
+    try:
+        from isis2json.iso2709 import IsoFile
+    except ImportError:
+        from iso2709 import IsoFile
+    try:
+        from isis2json.subfield import expand
+    except ImportError:
+        from subfield import expand
 
     iso = IsoFile(iso_file_name)
     for record in iso:
@@ -112,7 +123,7 @@ def writeJsonArray(iterRecords, file_name, output, qty, skip, id_tag,
     start = skip
     end = start + qty
     if not mongo:
-        output.write('[')
+        output.write('['.encode('ascii'))
     if id_tag:
         id_tag = str(id_tag)
         ids = set()
@@ -122,8 +133,8 @@ def writeJsonArray(iterRecords, file_name, output, qty, skip, id_tag,
         if i >= end:
             break
         if i > start and not mongo:
-            output.write(',')
-        output.write('\n')
+            output.write(','.encode('ascii'))
+        output.write('\n'.encode('ascii'))
         if start <= i < end:
             if id_tag:
                 occurrences = record.get(id_tag, None)
@@ -166,10 +177,30 @@ def writeJsonArray(iterRecords, file_name, output, qty, skip, id_tag,
                 record[constant_key] = constant_value
             output.write(json.dumps(record).encode('utf-8'))
     if not mongo:
-        output.write('\n]')
-    output.write('\n')
+        output.write('\n]'.encode('ascii'))
+    output.write('\n'.encode('ascii'))
+
 
 if __name__ == '__main__':
+    # Workaround to make open(name, "wb") work even when name is "-"
+    # (i.e, even when it's the standard output stream),
+    # because argparse.FileType("wb") uses the sys.stdout in that case,
+    # which is open in the "w" mode, not "wb"
+    STDOUT_FD = sys.stdout.fileno()
+
+    class StandardOutputWB(object):
+        def write(self, data):
+            os.write(STDOUT_FD, data)
+        def close(self):
+            pass  # Required to be file-like
+
+    class BufferlessWBFileType(argparse.FileType):
+        def __init__(self):
+            super(BufferlessWBFileType, self).__init__('wb')
+        def __call__(self, name):
+            if name == '-':
+                return StandardOutputWB()
+            return open(string, 'wb')
 
     # create the parser
     parser = argparse.ArgumentParser(
@@ -179,7 +210,7 @@ if __name__ == '__main__':
     parser.add_argument(
         'file_name', metavar='INPUT.(mst|iso)', help='.mst or .iso file to read')
     parser.add_argument(
-        '-o', '--out', type=argparse.FileType('w'), default=sys.stdout,
+        '-o', '--out', type=BufferlessWBFileType(), default='-',
         metavar='OUTPUT.json',
         help='the file where the JSON output should be written'
              ' (default: write to stdout)')
